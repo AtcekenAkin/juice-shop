@@ -1,0 +1,42 @@
+name: Juice Shop Security Scan
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+  workflow_dispatch:
+
+jobs:
+  build-and-sbom:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1️⃣ Repo'yu checkout et
+      - name: Checkout Repo
+        uses: actions/checkout@v3
+
+      # 2️⃣ Docker buildx kurulumu
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # 3️⃣ Docker image build (log’ları görebilmek için --progress=plain)
+      - name: Build Juice Shop Docker Image
+        run: docker build -t juice-shop:latest . --progress=plain
+
+      # 4️⃣ Syft kurulumu (hata tolere ediliyor)
+      - name: Install Syft
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh || true
+          mv syft /usr/local/bin/ || true
+
+      # 5️⃣ SBOM oluştur
+      - name: Generate SBOM
+        run: syft docker:juice-shop:latest -o json > sbom.json
+
+      # 6️⃣ SBOM’u upload et
+      - name: Upload SBOM Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: sbom
+          path: sbom.json
